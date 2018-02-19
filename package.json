@@ -1,0 +1,43 @@
+{
+  "name": "lightnode",
+  "version": "1.0.0",
+  "description": "LibreBank lightnode (Exchanges to Solidity proxy)",
+  "main": "tests.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node_modules/.bin/mocha --reporter spec test/autotests/",
+    "docker": "docker build",
+    "jsdoc": "jsdoc lib/db.js -d doc/api-jsdoc",
+    "documentation": "documentation build lib/db.js -f html -o doc/api-documentationjs",
+    "sphinx": "cd doc/sphinx-docs && make html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@bitbucket.org/librecrypto/lightnode.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/librecrypto/lightnode#readme",
+  "dependencies": {
+    "express": "^4.16.2",
+    "express-session": "^1.15.6",
+    "got": "^8.0.3",
+    "lodash": "^4.17.5",
+    "minimist": "^1.2.0",
+    "mongoose": "^5.0.4",
+    "nodemailer": "^4.4.2",
+    "passport": "^0.4.0",
+    "passport-local": "^1.0.0",
+    "passport-local-mongoose": "^4.4.0",
+    "slackbots": "^1.1.0",
+    "socket.io": "^2.0.4",
+    "socketio-jwt": "^4.5.0",
+    "web3": "^1.0.0-beta.29",
+    "winston": "^2.4.0"
+  },
+  "devDependencies": {
+    "jsdoc": "^3.5.5",
+    "should": "^13.1.3",
+    "standard": "^10.0.3"
+  }
+}
