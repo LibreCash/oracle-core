@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/mailer.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/mailer.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const
+    logger = require('./logger'),
+    nodemailer = require('nodemailer');
+
+// todo: refactor common notifications for mail &amp; slack (like in alarm)
+
+class Mailer {
+
+    /**
+     * Constructor
+     */
+
+    constructor () {
+    }
+
+    /**
+     * Setup
+     * @param {MailerOptions} options Mailer options
+     */
+
+    async setup (options) {
+        if (!options || !('useTestAccount' in options)) {
+            logger.error('mailer bad options');
+            return;
+        }
+
+        this.options = options;
+
+        if (!options.useTestAccount) {
+            await new Promise(resolve => {
+                nodemailer.createTestAccount((err, account) => {
+                    logger.log(account);
+
+                    var optionsTransport = {
+                        host: options.host,
+                        port: options.port,
+                        secure: options.secure, // true for 465, false for other ports
+                        auth: {
+                            user: account.user, // generated ethereal user
+                            pass: account.pass  // generated ethereal password
+                        }
+                    };
+                    this.setupTransport(optionsTransport);
+                    resolve();
+                });
+            });
+        }
+        else {
+            this.setupTransport(options);
+        }
+    }
+
+    /**
+     * Setup transport
+     * @param {TransportOptions} options Nodemailer transport options
+     */
+
+    setupTransport (options) {
+        this.transporter = nodemailer.createTransport(options);
+    }
+
+    /**
+     * Send mail
+     * @param {SendMailOptions} options Nodemailer send mail options
+     */
+
+    sendMail (mailOptions) {
+        logger.info('send mail', mailOptions);
+        
+        this.transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                return logger.error(error);
+            }
+            logger.log('Message sent: %s', info.messageId);
+            // Preview only available when sending through an Ethereal account
+            logger.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+        });
+    }
+
+    /**
+     * Send startup notification
+     */
+
+    sendStartup () {
+        this.sendLibreMail('LibreNode started up ✔',
+            `LibreNode started at ${(new Date).toString()}`);
+    }
+
+    /**
+     * Send ticker overflow notification
+     * @param {*} err Error info
+     */
+
+    sendNodeTickerOverflow (err) {
+        this.sendLibreMail('LibreNode ERROR: ticker overflow',
+            `LibreNode error\n${JSON.stringify(err)}`);
+    }
+
+    /**
+     * Send ethereum message
+     * @param {*} msg Message
+     */
+
+    sendEthereumMessage (msg) {
+        this.sendLibreMail('LibreNode Ethereum info',
+            `LibreNode ethereum info\n${JSON.stringify(msg)}`);
+    }
+
+    /**
+     * Send ethereum error
+     * @param {*} err Error info
+     */
+
+    sendEthereumError (err) {
+        this.sendLibreMail('LibreNode Ethereum error', 
+            `LibreNode ethereum error\n${JSON.stringify(err)}`);
+    }
+
+    /**
+     * Send libre mail
+     * @param {String} subject Subject
+     * @param {String} text Text
+     */
+
+     sendLibreMail (subject, text) {
+        let mailOptions = {
+            from: this.options.from, // sender address
+            to: this.options.to, // list of receivers
+            subject, // Subject line
+            text: text, // plain text body
+            html: `&lt;b>${text}&lt;/b>` // html body
+        };
+
+        this.sendMail(mailOptions);
+     }
+};
+
+module.exports = Mailer;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Fetcher.html">Fetcher</a></li><li><a href="Mailer.html">Mailer</a></li><li><a href="Slack.html">Slack</a></li><li><a href="Web3Client.html">Web3Client</a></li></ul><h3>Global</h3><ul><li><a href="global.html#actionSchema">actionSchema</a></li><li><a href="global.html#addAction">addAction</a></li><li><a href="global.html#addTicker">addTicker</a></li><li><a href="global.html#connect">connect</a></li><li><a href="global.html#createModel">createModel</a></li><li><a href="global.html#disconnect">disconnect</a></li><li><a href="global.html#exchangeSchema">exchangeSchema</a></li><li><a href="global.html#getActions">getActions</a></li><li><a href="global.html#getConnect">getConnect</a></li><li><a href="global.html#getDisconnect">getDisconnect</a></li><li><a href="global.html#getNodeExchangeOnOff">getNodeExchangeOnOff</a></li><li><a href="global.html#getNodeOnOff">getNodeOnOff</a></li><li><a href="global.html#getNodeState">getNodeState</a></li><li><a href="global.html#getNodeTickers">getNodeTickers</a></li><li><a href="global.html#getPing">getPing</a></li><li><a href="global.html#getPoolNotifications">getPoolNotifications</a></li><li><a href="global.html#getTickers">getTickers</a></li><li><a href="global.html#lightNodeStateSchema">lightNodeStateSchema</a></li><li><a href="global.html#masterNodeStateSchema">masterNodeStateSchema</a></li><li><a href="global.html#netNodeSchema">netNodeSchema</a></li><li><a href="global.html#nodeExchangeOnOff">nodeExchangeOnOff</a></li><li><a href="global.html#nodeOnOff">nodeOnOff</a></li><li><a href="global.html#nodeState">nodeState</a></li><li><a href="global.html#nodeTickers">nodeTickers</a></li><li><a href="global.html#notificationSchema">notificationSchema</a></li><li><a href="global.html#ping">ping</a></li><li><a href="global.html#poolNotifications">poolNotifications</a></li><li><a href="global.html#processNodesFinalAvarageRate">processNodesFinalAvarageRate</a></li><li><a href="global.html#processTickersAvarageRate">processTickersAvarageRate</a></li><li><a href="global.html#saveTickers">saveTickers</a></li><li><a href="global.html#tickerSchema">tickerSchema</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.5</a> on Mon Feb 19 2018 04:53:01 GMT-0500 (EST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

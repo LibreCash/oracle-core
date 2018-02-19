@@ -7,7 +7,7 @@
     "start": "node index.js",
     "test": "node_modules/.bin/mocha --reporter spec test/autotests/",
     "docker": "docker build",
-    "jsdoc": "jsdoc lib/db.js -d doc/api-jsdoc",
+    "jsdoc": "jsdoc . -r -d doc/api-jsdoc",
     "documentation": "documentation build lib/db.js -f html -o doc/api-documentationjs",
     "sphinx": "cd doc/sphinx-docs && make html"
   },

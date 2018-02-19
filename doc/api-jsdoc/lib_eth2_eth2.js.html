@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/eth2/eth2.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/eth2/eth2.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const
+    EventEmitter = require('events'),
+    path = require('path'),
+    fs = require('fs'),
+    _ = require('lodash'),
+    crypto = require('crypto'),
+    logger = require('../logger'),
+    Web3Client = require('./web3-client');
+
+// |online|             1. no web3 connection -> notify error, select another node
+// |online|             2. no new blocks
+// |checkSenderWallet|  3. sender wallet not present
+// |checkSenderWallet|  4. sender wallet is locked
+// |checkSenderWallet|  5. sender wallet bad password
+// |checkSenderWallet|  6. sender wallet no balance
+// |transaction|        7. transaction sending error
+// |transaction|        8. send transaction bad result
+// |config|             9. bad ABI
+// |config|             10. bad smart contract address
+// |config|             11. smart contract no address or gas limit
+
+// |deploy|             x1. create wallet if not exists
+
+// |init|               I1. unlock wallet at startup
+
+class Eth extends EventEmitter {
+    constructor () {
+        super();
+
+        this.clients = [];
+        this.clientsMap = {};
+
+        this.initState();
+    }
+
+    /**
+     * Init
+     * @param {EthOptions} options Eth options
+     */
+
+    init (options, callback) {
+        this.options = options;
+        this.callback = callback;
+        try {
+            let abiArray = this.loadAbi(options.abiPath);
+            if (!abiArray)
+                return;
+
+            this.state.activeClient = 'infura';
+
+            var opts = {
+                ...options,
+                abiArray
+            };
+
+            this.connect('web3', options.web3url, opts);
+            this.connect('infura', options.infuraUrl, opts);
+        }
+        catch (e) {
+            this.notifyError('ETH_INIT_ERROR', e);
+        }
+    }
+
+    /**
+     * Init state
+     */
+
+    initState () {
+        this.state = {
+            activeClient: null,
+            clients: [],
+            events: [],
+            lastPrice: 0,
+            lastUpdate: null
+        }
+    }
+
+    /**
+     * Return state
+     * @returns {EthState} Eth state
+     */
+
+    getState () {
+        // todo: review
+
+        this.state.status = _.clone(this.options);
+        delete this.state.status['password'];
+        this.state.status["abiHashMD5"] = this.abiHash;
+
+        this.state.clients = [];
+        for (var name in this.clientsMap) {
+            var client = this.clientsMap[name];
+
+            var clientState = {};
+
+            clientState.name = name;
+            clientState.url = client.url;
+
+            clientState.connected = client.web3Connected;
+            clientState.running = client.running;
+            clientState.lastError = client.lastError;
+            clientState.locked = client.locked;
+            clientState.balance = client.balance;
+
+            clientState.active = this.state.activeClient == name;
+            clientState.lastPrice = this.state.lastPrice;
+            clientState.lastUpdate = this.state.lastUpdate;
+    
+            this.state.clients.push(clientState);
+        }
+
+        return this.state;
+    }
+
+    /**
+     * Connect
+     * @param {String} name Name
+     * @param {String} url Web3 url
+     * @param {ConnectOptions} options Options
+     */
+
+    async connect (name, url, options) {
+        const client = new Web3Client(name);
+        
+        this.clients.push(client);
+        this.clientsMap[name] = client;
+
+        client.on('event', this.onClientEvent.bind(this));
+        await client.init(url, options);
+    }
+
+    /**
+     * Callback from web3 client
+     * @param {*} info
+     */
+
+    onClientEvent (...info) {
+        var name = info[0];
+        var code = info[1];
+        if (code == 'WEB3CLIENT_CONNECTED') {
+            this.state.activeClient = name;
+        }
+        else if (code == 'WEB3CLIENT_DISCONNECTED') {
+            this.state.activeClient = 'infura';
+            this.notifyError(...info);
+        }
+        else if (code == 'WEB3CLIENT_ERROR') {
+            this.notifyError(...info);
+        }
+        else if (code == 'NewOraclizeQuery') {
+            this.callback(code, info[2], info[3]);
+        }
+        else {
+            this.notifyError(...info);
+        }
+    }
+
+    // check wallet
+
+    checkSenderWallet () {
+
+    }
+
+    /**
+     * Load abi from path
+     * @param {String} abi ABI path
+     * @returns {AbiArray} ABI array
+     */
+
+    loadAbi (abiPath) {
+        try {
+            let abiArrayPath = path.resolve(abiPath);
+            let abiData = fs.readFileSync(abiArrayPath);
+            this.abiHash = crypto.createHash('md5').update(abiData).digest("hex");
+            let abiArray = JSON.parse(abiData);
+            return abiArray;
+        }
+        catch (e) {
+            this.notifyError('ETH_ERROR_READ_ABI', e);
+            return null;
+        }
+    }
+
+    /**
+     * Push to blockchain
+     */
+
+    pushToBlockchain (avg) {
+        var client = this.clientsMap[this.state.activeClient];
+        if (!client) {
+            logger.error('Unable push to blockchain. Active client is undefined.');
+            return 
+        }
+        avg = avg * 1000;
+        client.contractPushToBlockchain(avg, {
+            from: this.options.from,
+            gasLimit: this.options.gasLimit
+        });
+
+        this.state.lastPrice = avg;
+        this.state.lastUpdate = new Date().toISOString();
+    }
+
+    /**
+     * Notify error
+     * @param {*} err Error
+     */
+
+    notifyError (...err) {
+        this.state.events.push([...err]);
+        logger.error(...err);
+        this.emit('error', ...err);
+    }
+}
+
+module.exports = Eth;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Fetcher.html">Fetcher</a></li><li><a href="Mailer.html">Mailer</a></li><li><a href="Slack.html">Slack</a></li><li><a href="Web3Client.html">Web3Client</a></li></ul><h3>Global</h3><ul><li><a href="global.html#actionSchema">actionSchema</a></li><li><a href="global.html#addAction">addAction</a></li><li><a href="global.html#addTicker">addTicker</a></li><li><a href="global.html#connect">connect</a></li><li><a href="global.html#createModel">createModel</a></li><li><a href="global.html#disconnect">disconnect</a></li><li><a href="global.html#exchangeSchema">exchangeSchema</a></li><li><a href="global.html#getActions">getActions</a></li><li><a href="global.html#getConnect">getConnect</a></li><li><a href="global.html#getDisconnect">getDisconnect</a></li><li><a href="global.html#getNodeExchangeOnOff">getNodeExchangeOnOff</a></li><li><a href="global.html#getNodeOnOff">getNodeOnOff</a></li><li><a href="global.html#getNodeState">getNodeState</a></li><li><a href="global.html#getNodeTickers">getNodeTickers</a></li><li><a href="global.html#getPing">getPing</a></li><li><a href="global.html#getPoolNotifications">getPoolNotifications</a></li><li><a href="global.html#getTickers">getTickers</a></li><li><a href="global.html#lightNodeStateSchema">lightNodeStateSchema</a></li><li><a href="global.html#masterNodeStateSchema">masterNodeStateSchema</a></li><li><a href="global.html#netNodeSchema">netNodeSchema</a></li><li><a href="global.html#nodeExchangeOnOff">nodeExchangeOnOff</a></li><li><a href="global.html#nodeOnOff">nodeOnOff</a></li><li><a href="global.html#nodeState">nodeState</a></li><li><a href="global.html#nodeTickers">nodeTickers</a></li><li><a href="global.html#notificationSchema">notificationSchema</a></li><li><a href="global.html#ping">ping</a></li><li><a href="global.html#poolNotifications">poolNotifications</a></li><li><a href="global.html#processNodesFinalAvarageRate">processNodesFinalAvarageRate</a></li><li><a href="global.html#processTickersAvarageRate">processTickersAvarageRate</a></li><li><a href="global.html#saveTickers">saveTickers</a></li><li><a href="global.html#tickerSchema">tickerSchema</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.5</a> on Mon Feb 19 2018 04:53:01 GMT-0500 (EST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
