@@ -3,7 +3,7 @@ const
     LightNode = require('../lib/node/lightnode'),
     MasterNode = require('../lib/node/masternode');
 
-var options = require('../config/default.json.sample');
+var options = require('../config/default.json');
     
 var optionsLightnode0 = options.lightnode0;
 var optionsLightnode1 = options.lightnode1;
