@@ -18,6 +18,10 @@ git clone https://github.com/LibreCash/oracle-core
 cd oracle-core
 npm install
 ```
+Run demo
+```
+npm start
+```
 ## Contiributing
 If you want to help us get better - create issue and PR.
 
