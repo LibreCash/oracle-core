@@ -201,7 +201,7 @@ class LightNode extends EventEmitter {
 
         await this.updateTickers(tickers);
 
-        Promise.delay(this.options.updateTimeout * 1000).then(this.update.bind(this));
+        delay(this.options.updateTimeout * 1000).then(this.update.bind(this));
     }
 
     // rates
